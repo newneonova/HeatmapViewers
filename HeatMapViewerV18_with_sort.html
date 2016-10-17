@@ -1,0 +1,2935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+ <meta charset="utf-8">
+    <title>Heatmap Viewer</title>
+
+	</head>
+	
+	 <style>
+	 #draw { 
+    cursor: default;
+}
+#draw:active { 
+    cursor: crosshair;
+}
+	 #slide { 
+    cursor: default;
+}
+#slide:active { 
+    cursor: move;
+}
+
+
+
+body {
+  position: relative;
+  //width: 960px;
+}
+
+svg {
+  font: 10px sans-serif;
+  //shape-rendering: crispEdges;
+}
+
+rect {
+  fill: #ddd;
+}
+
+.axis path,
+.axis line {
+  fill: none;
+  stroke: #fff;
+}
+
+.under {
+position:absolute;
+}
+
+.FrontC {
+position:absolute;
+
+}
+
+
+</style>
+   <div id="MASK" style="display:none; position:fixed; width:100%; background-color:rgba(100,100,100,.5); height:100%;text-align: center;
+vertical-align: middle;
+line-height: 100%;"/>
+<span id="MASKREST" style="position:fixed; top:50%; font-size:40px;">
+  Sorting heatmap, please wait.
+</span>
+<span id="MASK2" style="position:fixed; top:50%; font-size:40px;">
+
+</span>
+ 
+   </div>
+   
+<body bgcolor="#E6E6FA">
+<div id='Placeholder'></div>
+<div id='Panel' style=" background-color:#bfbfbf;">
+  <input type="file" id="file" /> 
+  <input type="file" id="DirLoad" webkitdirectory directory multiple/>
+  <br><input type="checkbox" onclick='handleClick(this);' >Show CSV row/column numbers
+  <button type="button" onclick="OpenColorScale()" id="Confirm">Change color scale</button>
+  <button type="button" onclick="SaveHeatmapAsImage()" id="Confirm">Save Heatmap as image</button>
+    <button type="button" onclick="ExportSvg()" id="Confirm">Export as SVG</button>
+	 <button type="button" onclick="SaveHeatmapAsImageHighDPI()" id="Confirm">Save Heatmap as high DPI image</button>
+	  <button type="button" onclick="changeDPI()" id="Confirm">Change DPI of image</button>
+	 
+	
+	    <button type="button" onclick="SetSize()" id="Confirm">Set cell size</button>
+     <!--input type="checkbox" id="Logscale" onclick='Swap()' unchecked> LogScale<br-->
+	 <input type="checkbox" id="ToBin" onclick='SwapBin()' checked> Bin Data<br>
+	 <input type="checkbox" id="ToKey" onclick='SwapBinKey()' checked> Lock key to Bin<br>
+	  <input type="checkbox" id="ShowNums" onclick='DrawHeatMap()'> Show number values<br>
+	    <input type="checkbox" id="ClusterRow" onclick='cluster()'> Cluster similar rows<br>
+	  
+    <button type="button" onclick="RowColRange()" id="Confirm">Rows/Columns to include</button>
+
+   <!--button type="button" onclick="SetCsvParams()" id="Confirm">Define Csv row/column numbers</button>-->
+	</div>
+	<div id='MultiFile' style="white-space:nowrap; visibility:hidden;">
+	 <button type="button" onclick="Prev()" id="Confirm"><-- Previous Heatmap</button><button type="button" onclick="Next()" id="Confirm">Next Heatmap --></button><b id='NAMES'>TEXTTEXTEXT</b> 
+	</div>
+  <div id="ColorMenu">
+  </div>
+  <div id="ColorPicker"/>
+  </div>
+
+
+<div id="Display" />
+   </div>
+<div id="Stores" style="visibility:hidden; position:absolute; height:0px; top:0px;"/>
+   </div>
+   
+
+
+<svg  xmlns="http://www.w3.org/2000/svg" id='exportingSVG' style="visibility:hidden;position:absolute; top:0;">
+  
+
+</svg>
+</body>
+
+
+ <script>
+ //To do for this version. Change rows and columns included buttons to be single button opening a form of some sort.  
+ //Add a form to input csv numbers for column containing row name information, first column of data, first row of data, row contianing column headers
+
+
+function componentToHex(c) {
+    var hex = c.toString(16);
+    return hex.length == 1 ? "0" + hex : hex;
+}
+function rgbToHex(r, g, b) {
+    return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
+	//Thanks to Tim Down at http://stackoverflow.com/questions/5623838/rgb-to-hex-and-hex-to-rgb
+}
+
+function UpdateMask(Num){
+MASK2.textContent=Num;
+}
+function ShowMask(){
+MASK.style.display='';
+}
+function HideMask(){
+MASK.style.display='none';
+}
+
+
+ColLabels=0;
+RowNames=0;
+RowData=1;
+ColData=1;
+IsLog=false;
+StoredTable=[];
+DataTable=[];
+
+
+/*
+function SetCsvParams(){
+
+Old=document.getElementById('Panel');
+Old.style.visibility= "hidden";
+
+Input=document.createElement('div');
+Input.id='Inputs';
+
+
+//Input.setAttribute('style','position:absolute;top:0;');
+
+
+Bah=document.createElement('div');
+ColLabLay=document.createElement('label');
+ColLabLay.textContent='Row containing column labels';
+ColLab=document.createElement('input');
+ColLab.value=String(ColLabels+1);
+ColLabLay.appendChild(ColLab);
+Bah.appendChild(ColLabLay);
+Input.appendChild(Bah);
+
+Bah=document.createElement('div');
+ColLabLay=document.createElement('label');
+ColLabLay.textContent='Column containing Row labels';
+RowLab=document.createElement('input');
+RowLab.value=String(RowNames+1);
+ColLabLay.appendChild(RowLab);
+Bah.appendChild(ColLabLay);
+Input.appendChild(Bah);
+
+
+
+
+Bah=document.createElement('div');
+BUTT=document.createElement('button');
+BUTT.setAttribute('onclick','SetCsvParamsConfirm()');
+BUTT.textContent='Submit';
+Bah.appendChild(BUTT);
+Input.appendChild(Bah);
+document.getElementById('Placeholder').appendChild(Input);
+}
+
+function SetCsvParamsConfirm(){
+
+if(!isNaN(parseInt(ColLab.value))){
+ColLabels=parseInt(ColLab.value)-1;
+ColData=ColLabels+1;
+}
+if(!isNaN(parseInt(RowLab.value))){
+RowNames=parseInt(RowLab.value)-1;
+RowData=RowNames+1;
+}
+Input.parentElement.removeChild(Input);
+Old.style.visibility= "visible";
+DrawHeatMap();
+}
+*/
+
+
+RowLimiter=[];
+ColumnLimiter=[];
+RowString='';
+ColumnString='';
+
+function RowColRange(){
+RowLimiter=[];
+ColumnLimiter=[];
+Old=document.getElementById('Panel');
+Old.style.visibility= "hidden";
+
+Input=document.createElement('div');
+Input.id='Inputs';
+
+
+//Input.setAttribute('style','position:absolute;top:0;');
+Bah=document.createElement('div');
+//Instructions=document.createElement('textarea');
+Instructions=document.createElement('div');
+Instructions.setAttribute('readonly','');
+
+//Instructions.setAttribute('style','resize:none; width:350px; height:200px;background-color:#ffffff;');
+Instructions.setAttribute('style','background-color:#d9d9d9;');
+//Instructions.value=
+Instructions.textContent='Please enter which data rows and columns to include in the heatmap. Row/column numbers based on original .csv row/column numbers. Can list individual rows/columns as a comma separated list, or can enter a range in the form of Start:End. For example:\n2,3,5:9,22\nmeans include row/column 2,3 5 through 9, and 22.  Preceed with a "-", a minus sign, to exclude. i.e.\n-2\nmeans exclude row/column 2. Leave blank to include everything.';
+
+Bah.appendChild(Instructions);
+Input.appendChild(Bah);
+
+Bah=document.createElement('div');
+RowCap=document.createElement('label');
+RowCap.textContent='Rows to display';
+RowZ=document.createElement('input');
+RowZ.value=RowString;
+RowCap.appendChild(RowZ);
+Bah.appendChild(RowCap);
+Input.appendChild(Bah);
+
+//RowZ.rows='1';
+Bah=document.createElement('div');
+ColCap=document.createElement('label');
+ColCap.textContent='Columns to display';
+ColZ=document.createElement('input');
+ColCap.appendChild(ColZ);
+ColZ.value=ColumnString;
+//ColZ.rows='1';
+
+
+Bah.appendChild(ColCap);
+Input.appendChild(Bah);
+
+Bah=document.createElement('div');
+BUTT=document.createElement('button');
+BUTT.setAttribute('onclick','ConfirmIncludes()');
+BUTT.textContent='Submit';
+Bah.appendChild(BUTT);
+Input.appendChild(Bah);
+document.getElementById('Placeholder').appendChild(Input);
+}
+
+function ConfirmIncludes(){
+RowString=RowZ.value;
+ColumnString=ColZ.value;
+RangeRows();
+RangeColumns();
+
+
+Input.parentElement.removeChild(Input);
+Old.style.visibility= "visible";
+PopUseTable();
+
+}
+
+function RangeRows(){
+RowLimiter=[];
+//var TempString=prompt("Please enter which data rows to include in the heatmap. Row numbers based on original .csv file assuming first row of csv file is column headers, so for instance the first row is 2. You can enter individual numbers or a range, numbers and ranges separated by commas. By default, entered number and ranges are rows to keep, you can define this to be rows omitted by preceeding everything with a '-', a minus sign. For example to select rows 2,3,  11,  100 through 300, 411, and  500 through 555 you would type:\n 2,3,11,100:300,411,500:555 \nTo exclude these specifically mentioned rows, you would type:\n -2,3,11,100:300,411,500:555\nLeave blank to include all rows.",RowString);
+TempString=null;
+if(TempString!=null){
+RowString=TempString;
+}
+else{
+TempString=RowString;
+}
+var Mult=1;
+if(TempString.indexOf('-')!=-1){
+TempString=TempString.replace('-','');
+Mult=-1;
+}
+var RowArray=TempString.split(',');
+for(var i=0; i<RowArray.length;i++){
+if (RowArray[i].indexOf(':')==-1){
+
+var Ind=Math.max(parseInt(RowArray[i])-2,0);
+if(!isNaN(Ind)){
+RowLimiter.push(Mult*(Ind));
+}}
+else{
+Ranges=RowArray[i].split(':');
+Start=Math.max(parseInt(Ranges[0])-2,0);
+End=Math.max(parseInt(Ranges[1])-2,0);
+if((!isNaN(Start))&&(!isNaN(End))){
+if(Start>End){
+for(var j=Start;j>=End;j--){
+RowLimiter.push(Mult*j);
+}
+}
+else{
+for(var j=Start;j<=End;j++){
+RowLimiter.push(Mult*j);
+}
+}
+
+}
+}
+
+
+
+}
+
+
+
+
+
+
+//DrawHeatMap();
+
+}
+function RangeColumns(){
+ColumnLimiter=[];
+TempString=null;
+//var TempString=prompt("Please enter which data columns to include in the heatmap. Column numbers based on original .csv file assuming first column of csv file is row names, so for instance the first column is 2. You can enter individual numbers or a range, numbers and ranges separated by commas. By default, entered number and ranges are columns to keep, you can define this to be columns omitted by preceeding everything with a '-', a minus sign.  For example to select columns 2,3,11, 100 through 300, 411, 500 through 555 you would type:\n 2,3,11,100:300,411,500:555 \nTo omit these instead type::\n -2,3,11,100:300,411,500:555 \nLeave blank to include all columms.",ColumnString);
+if(TempString!=null){
+ColumnString=TempString;
+}
+else{
+TempString=ColumnString;
+}
+var Mult=1;
+if(TempString.indexOf('-')!=-1){
+TempString=TempString.replace('-','');
+Mult=-1;
+}
+
+
+
+
+var RowArray=TempString.split(',');
+for(var i=0; i<RowArray.length;i++){
+if (RowArray[i].indexOf(':')==-1){
+var Ind=Math.max(parseInt(RowArray[i])-2,0);
+if(!isNaN(Ind)){
+ColumnLimiter.push(Mult*(Ind));
+}}
+else{
+Ranges=RowArray[i].split(':');
+Start=Math.max(parseInt(Ranges[0])-2,0);
+End=Math.max(parseInt(Ranges[1])-2,0);
+
+if((!isNaN(Start))&&(!isNaN(End))){
+if(Start>End){
+for(var j=Start;j>=End;j--){
+ColumnLimiter.push(Mult*j);
+}
+}
+else{
+for(var j=Start;j<=End;j++){
+ColumnLimiter.push(Mult*j);
+}
+}
+
+}
+}
+
+
+
+}
+
+
+//DrawHeatMap();
+
+
+}
+
+function setDPI(canvas, dpi) {
+    // Set up CSS size if it's not set up already
+/*    if (!canvas.style.width)
+        canvas.style.width = canvas.width + 'px';
+    if (!canvas.style.height)
+        canvas.style.height = canvas.height + 'px';
+*/
+    var scaleFactor = dpi / 72; //it's 72 not 96 by default
+    canvas.width = Math.ceil(canvas.width * scaleFactor);
+    canvas.height = Math.ceil(canvas.height * scaleFactor);
+    var ctx = canvas.getContext('2d');
+    ctx.scale(scaleFactor, scaleFactor);
+}
+
+
+
+
+
+function SaveHeatmapAsImage(){
+if(typeof DataTable !== 'undefined'){
+
+BigPicture=document.createElement('canvas');
+BContext=BigPicture.getContext('2d');
+
+//iterate through the divs inside of Display
+var ancestor = document.getElementById('Display');
+ var descendents = ancestor.getElementsByTagName('div');
+ 
+
+ var Yhi=0
+for(var i=0; i<descendents.length; i++){
+
+ Canvases = descendents[i].getElementsByTagName('canvas');
+ var Xwid=0
+for(var j=0;j<Canvases.length;j++){
+
+Xwid=Xwid+Canvases[j].width;
+
+}
+Yhi=Yhi+Canvases[0].height;
+
+}
+ BigPicture.width=Xwid;
+ BigPicture.height=Yhi;
+ 
+ 
+ var Yoffset=0;
+ 
+for(var i=0; i<descendents.length; i++){
+var Xoffset=0;
+ Canvases = descendents[i].getElementsByTagName('canvas');
+for(var j=0;j<Canvases.length;j++){
+
+BContext.drawImage(Canvases[j],Xoffset,Yoffset);
+Xoffset=Xoffset+Canvases[j].width;
+
+}
+Yoffset=Yoffset+Canvases[0].height;
+
+}
+
+ 
+ link=document.createElement("a");
+link.download='Heatmap.png';
+link.href=BigPicture.toDataURL("image/png");
+link.click();
+
+//javascript:void(window.open().location = BigPicture.toDataURL("image/png"))
+BigPicture.remove()
+}
+
+}
+
+
+
+
+
+
+
+function OpenColorPicker(COLOR,PosX,PosY,WhichBar){
+
+if(PosX > slide.width-300){
+PosX=PosX-300;
+}
+
+//COLOR is an rgb array [r,g,b]
+
+Parent=document.getElementById('ColorPicker');
+Picker=document.createElement('canvas');
+Picker.id='draw';
+Pcontext=Picker.getContext('2d');
+Parent.appendChild(Picker);
+Picker.setAttribute('style',"position:absolute; left:"+PosX+"px; top:"+PosY+"px;");
+Picker.width=350;
+Picker.height=200;
+Pcontext.fillStyle=rgbToHex(25,25,25);
+Pcontext.fillRect(0,0,Pcontext.canvas.width,Pcontext.canvas.height);
+
+//Thanks to http://seesparkbox.com/foundry/how_i_built_a_canvas_color_picker
+var gradient = Pcontext.createLinearGradient(5,5,Picker.width-80,5);
+gradient.addColorStop(0,    "rgb(255,   0,   0)");
+gradient.addColorStop(0.15, "rgb(255,   0, 255)");
+gradient.addColorStop(0.33, "rgb(0,     0, 255)");
+gradient.addColorStop(0.49, "rgb(0,   255, 255)");
+gradient.addColorStop(0.67, "rgb(0,   255,   0)");
+gradient.addColorStop(0.84, "rgb(255, 255,   0)");
+gradient.addColorStop(1,    "rgb(255,   0,   0)");
+Pcontext.fillStyle=gradient;
+Pcontext.fillRect(5,5,Pcontext.canvas.width-80,Pcontext.canvas.height-10);
+ gradient = Pcontext.createLinearGradient(0, 5, 0, Pcontext.canvas.height-10);
+  gradient.addColorStop(0,   "rgba(255, 255, 255, 1)");
+  gradient.addColorStop(0.5, "rgba(255, 255, 255, 0)");
+  gradient.addColorStop(0.5, "rgba(0,     0,   0, 0)");
+  gradient.addColorStop(1,   "rgba(0,     0,   0, 1)");
+  Pcontext.fillStyle=gradient;
+Pcontext.fillRect(5,5,Pcontext.canvas.width-80,Pcontext.canvas.height-10);
+Pcontext.fillStyle=rgbToHex(210,210,210);
+Pcontext.fillRect(Pcontext.canvas.width-50,Pcontext.canvas.height-30,40,20);
+Pcontext.fillStyle=rgbToHex(0,0,0);
+Pcontext.font="8px sans-serif";
+Pcontext.fillText('Confirm',Pcontext.canvas.width-50+5,Pcontext.canvas.height-30+10);
+Pcontext.fillStyle=rgbToHex(COLOR[0],COLOR[1],COLOR[2]);
+Pcontext.fillRect(Pcontext.canvas.width-50,30,40,20);
+
+
+gradient = Pcontext.createLinearGradient(Pcontext.canvas.width-80,5,Pcontext.canvas.width-80,Pcontext.canvas.height-10);
+gradient.addColorStop(0,    "rgb(0,   0,   0)");
+gradient.addColorStop(.5,   rgbToHex(COLOR[0],COLOR[1],COLOR[2]));
+
+gradient.addColorStop(1,    "rgb(255,   255,   255)");
+Pcontext.fillStyle=gradient;
+Pcontext.fillRect(Pcontext.canvas.width-80,5,20,Pcontext.canvas.height-10);
+
+
+PickDown=false;
+Picker.addEventListener('mousedown', function(evt) {
+PickDown=true;
+  var rect = Picker.getBoundingClientRect();
+  var x = evt.clientX - rect.left;
+  var y = evt.clientY - rect.top;
+
+ if((x>5)&&(x<Pcontext.canvas.width-60)&&(y>5)&&(y<Pcontext.canvas.height-10)){
+
+  var c = Pcontext.getImageData(x, y, 1, 1).data;
+
+  COLOR[0]=c[0];
+  COLOR[1]=c[1];
+  COLOR[2]=c[2];
+Pcontext.fillStyle=rgbToHex(COLOR[0],COLOR[1],COLOR[2]);
+Pcontext.fillRect(Pcontext.canvas.width-50,30,40,20);
+
+
+  }
+  
+  if((x>Pcontext.canvas.width-50)&&(x<Pcontext.canvas.width-50+40)&&(y>Pcontext.canvas.height-30)&&(y<Pcontext.canvas.height-30+20)){
+  ClosePicker(WhichBar,COLOR);
+
+  }
+
+  
+  });
+  Picker.addEventListener('mousemove', function(evt) {
+  if(PickDown==true){
+  var rect = Picker.getBoundingClientRect();
+  var x = evt.clientX - rect.left;
+  var y = evt.clientY - rect.top;
+ if((x>5)&&(x<Pcontext.canvas.width-60)&&(y>5)&&(y<Pcontext.canvas.height-10)){
+
+  var c = Pcontext.getImageData(x, y, 1, 1).data;
+
+
+  COLOR[0]=c[0];
+  COLOR[1]=c[1];
+  COLOR[2]=c[2];
+Pcontext.fillStyle=rgbToHex(COLOR[0],COLOR[1],COLOR[2]);
+Pcontext.fillRect(Pcontext.canvas.width-50,30,40,20);
+
+  }
+  
+ 
+  
+  }
+  });
+  
+Picker.addEventListener('mouseleave', function(evt) {
+if(PickDown==true){
+	  var rect = Picker.getBoundingClientRect();
+  var x = evt.clientX - rect.left;
+  var y = evt.clientY - rect.top;
+	PickDown=false;
+	  if(x>Pcontext.canvas.width-80 && x<Pcontext.canvas.width-60){
+
+  }
+  else if (x>Pcontext.canvas.width-60){
+  	gradient = Pcontext.createLinearGradient(Pcontext.canvas.width-80,5,Pcontext.canvas.width-80,Pcontext.canvas.height-10);
+	
+gradient.addColorStop(0,    "rgb(0,   0,   0)");
+gradient.addColorStop(1,    "rgb(255,   255,   255)");
+Pcontext.fillStyle=gradient;
+Pcontext.fillRect(Pcontext.canvas.width-80,5,20,Pcontext.canvas.height-10);
+  
+  }
+  else{
+	gradient = Pcontext.createLinearGradient(Pcontext.canvas.width-80,5,Pcontext.canvas.width-80,Pcontext.canvas.height-10);
+	  var c = Pcontext.getImageData(x, Pcontext.canvas.height/2, 1, 1).data;
+
+	
+gradient.addColorStop(0,    "rgb(0,   0,   0)");
+gradient.addColorStop(.5,    rgbToHex(c[0],c[1],c[2]));
+gradient.addColorStop(1,    "rgb(255,   255,   255)");
+Pcontext.fillStyle=gradient;
+Pcontext.fillRect(Pcontext.canvas.width-80,5,20,Pcontext.canvas.height-10);
+	}}});
+
+  
+Picker.addEventListener('mouseup', function(evt) {
+	  var rect = Picker.getBoundingClientRect();
+  var x = evt.clientX - rect.left;
+  var y = evt.clientY - rect.top;
+	PickDown=false;
+	  if(x>Pcontext.canvas.width-80 && x<Pcontext.canvas.width-60){
+
+  }
+  else if (x>Pcontext.canvas.width-60){
+  	gradient = Pcontext.createLinearGradient(Pcontext.canvas.width-80,5,Pcontext.canvas.width-80,Pcontext.canvas.height-10);
+	
+gradient.addColorStop(0,    "rgb(0,   0,   0)");
+gradient.addColorStop(1,    "rgb(255,   255,   255)");
+Pcontext.fillStyle=gradient;
+Pcontext.fillRect(Pcontext.canvas.width-80,5,20,Pcontext.canvas.height-10);
+  
+  }
+  else{
+	gradient = Pcontext.createLinearGradient(Pcontext.canvas.width-80,5,Pcontext.canvas.width-80,Pcontext.canvas.height-10);
+	  var c = Pcontext.getImageData(x, Pcontext.canvas.height/2, 1, 1).data;
+
+	
+gradient.addColorStop(0,    "rgb(0,   0,   0)");
+gradient.addColorStop(.5,    rgbToHex(c[0],c[1],c[2]));
+gradient.addColorStop(1,    "rgb(255,   255,   255)");
+Pcontext.fillStyle=gradient;
+Pcontext.fillRect(Pcontext.canvas.width-80,5,20,Pcontext.canvas.height-10);
+	}});
+  
+
+
+
+
+ 
+}
+function ClosePicker(WhichBar,Cin){
+var BODY=document.getElementById('ColorPicker');
+var BBB=BODY.cloneNode(false);
+BODY.parentNode.replaceChild(BBB ,BODY);
+
+  OurBar.polecolor[WhichBar][0]=parseInt(Cin[0]);
+ OurBar.polecolor[WhichBar][1]=parseInt(Cin[1]);
+  OurBar.polecolor[WhichBar][2]=parseInt(Cin[2]);
+
+  NoMore=false;
+  DrawCurrentBar(ColorContext);
+}
+NoMore=false;
+
+function CloseColor(){
+var BODY=document.getElementById('ColorMenu');
+var BBB=BODY.cloneNode(false);
+BODY.parentNode.replaceChild(BBB ,BODY);
+ColorOpen=false;
+}
+
+ColorOpen=false;
+function OpenColorScale(){
+if(!ColorOpen){
+ColorOpen=true;
+Parent=document.getElementById('ColorMenu');
+CloseButton=document.createElement('button');
+CloseButton.textContent='Close';
+CloseButton.setAttribute('onclick','CloseColor()');
+Parent.appendChild(CloseButton);
+CloseButton=document.createElement('button');
+CloseButton.textContent='Add Pole';
+CloseButton.setAttribute('onclick','AddPole()');
+Parent.appendChild(CloseButton);
+ColorCanv=document.createElement('canvas');
+ColorCanv.id='slide';
+ColorCanv.width=600;
+ColorCanv.height=200;
+ColorContext=ColorCanv.getContext('2d');
+ColorContext.fillStyle=rgbToHex(255,255,255);
+ColorContext.fillRect(0,0,ColorContext.canvas.width,ColorContext.canvas.height);
+
+Parent.appendChild(ColorCanv);
+DrawCurrentBar(ColorContext);
+
+
+ColorCanv.addEventListener('mousedown', function(evt) {
+if(!NoMore){
+  var rect = ColorCanv.getBoundingClientRect();
+  var x = evt.clientX - rect.left;
+  var y = evt.clientY - rect.top;
+ 
+  //Check if a kill box
+  for(var i=0; i<KillRect.length;i++){
+  var KR=KillRect[i];
+  if((x>KR[0]-2)&&(x<KR[0]+5+2)&&(y>KR[1]-2)&&(y<KR[1]+5+2)){
+  OurBar.DeletePole(KR[2]);
+  DrawCurrentBar(ColorContext);
+  return 0
+  }  
+  }
+  
+    //check if a color box
+  for(var i=0; i<ColorChooserRec.length;i++){
+    var KR=ColorChooserRec[i];
+  if((x>=KR[0]-2)&&(x<=KR[0]+10+2)&&(y>=KR[1]-2)&&(y<=KR[1]+10+2)){
+  var Cin=[OurBar.polecolor[KR[2]][0],OurBar.polecolor[KR[2]][1],OurBar.polecolor[KR[2]][2]];
+  
+  OpenColorPicker(Cin,evt.clientX,evt.clientY,KR[2]);
+  NoMore=true;
+
+  return 0
+  }  
+  }
+  
+
+  //check if a movable pole
+    for(var i=0; i<PollTracker.length;i++){
+    var KR=PollTracker[i];
+  if((x>=KR[0]-3)&&(x<=KR[0]+5+3)&&(y>=KR[1]-3)&&(y<=KR[1]+80+3)){
+  ClickedPole=KR[2];
+  OurBar.fixed[KR[2]]='p';
+  DrawCurrentBar(ColorContext);
+  return 0
+  }  
+  }
+  
+  for(var i=0; i<InputRect.length;i++){
+ 
+    var KR=InputRect[i];
+  if((x>=KR[0]-2)&&(x<=KR[0]+5+2)&&(y>=KR[1]-2)&&(y<=KR[1]+5+2)){
+  var Percent=OurBar.pole[KR[2]];
+  var Value=OurBar.polevalue[KR[2]];
+  var Cin=prompt("Enter a number for the value of this color pole. Or enter as a percent of total i.e. 50%",Value);
+  if(Cin.indexOf('%')!=-1){
+  OurBar.fixed[KR[2]]='p';
+  OurBar.pole[KR[2]]=parseFloat(Cin.split('%')[0]);
+  }
+  else{
+  OurBar.fixed[KR[2]]='v';
+  OurBar.polevalue[KR[2]]=parseFloat(Cin);
+  OurBar.pole[KR[2]]=(OurBar.polevalue[KR[2]]-OurBar.polevalue[0])/(OurBar.polevalue[1]-OurBar.polevalue[0])*100;
+  }
+  OurBar.UpdatePoles(OurBar.polevalue[0],OurBar.polevalue[1]);
+  DrawCurrentBar(ColorContext);
+  return 0
+  }  
+  }
+  
+  
+  }});
+  ClickedPole=-1;
+  
+  ColorCanv.addEventListener('mousemove', function(evt) {
+ // console.log(ClickedPole);
+if((ClickedPole>-1)){
+  var rect = ColorCanv.getBoundingClientRect();
+  var x = evt.clientX - rect.left;
+  var y = evt.clientY - rect.top;
+  if((x>50)&&(x<ColorCanv.width-50)){
+  XPercent = (x-50)/(ColorCanv.width-100);
+  OurBar.pole[ClickedPole]=XPercent*100;
+  
+  OurBar.polevalue[ClickedPole]=OurBar.min+OurBar.pole[ClickedPole]*(OurBar.max-OurBar.min)/100;
+  OurBar.UpdatePoles(OurBar.polevalue[0],OurBar.polevalue[1]);
+  DrawCurrentBar(ColorContext);
+  }
+}
+}
+);
+ColorCanv.addEventListener('mouseup', function(evt) {
+
+ClickedPole=-1;
+}
+
+);
+
+
+}
+else{
+CloseColor();
+
+}
+}
+
+function AddPole(){
+OurBar.AddPole();
+DrawCurrentBar(ColorContext);
+}
+
+function DrawCurrentBar(ctx){
+DrawHeatMap();
+if(ctx!=null){
+ColorChooserRec=[];
+PollTracker=[];
+KillRect=[];
+InputRect=[];
+  ctx.font="10px sans-serif";
+ctx.fillStyle=rgbToHex(255,255,255);
+ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
+var LeftX=50;
+var RightX=ctx.canvas.width-50;
+ctx.strokeStyle=rgbToHex(0,0,0);
+ctx.beginPath();
+ctx.moveTo(LeftX,100);
+ctx.lineTo(RightX,100);
+
+ctx.stroke();
+ctx.fillStyle=rgbToHex(25,25,25);
+ctx.fillRect(LeftX,60,5,80);
+ctx.fillRect(RightX,60,5,80);
+var BarRange=RightX-LeftX;
+for( var i=0;i<OurBar.pole.length;i++){
+var PerAlong=OurBar.pole[i]/100;
+var Xpos=LeftX+BarRange*PerAlong;
+ColorChooserRec.push([Xpos,30,i]);
+ctx.fillStyle=OurBar.GetColor(OurBar.polevalue[i]);
+ctx.fillRect(Xpos,30,10,10);
+ctx.fillStyle=rgbToHex(0,0,0);
+if(OurBar.fixed[i]=='p'){
+ctx.fillText(Math.round(OurBar.pole[i]*100)/100+'%',Xpos,59);
+}
+if(OurBar.fixed[i]=='v'){
+ctx.fillText(Math.round(OurBar.polevalue[i]*100)/100,Xpos,59);
+}
+
+if(i>1){ //These poles are special, lighter colored,tracked,have delete pole buttons
+ctx.fillStyle=rgbToHex(50,50,50);
+ctx.fillRect(Xpos,60,5,80);
+PollTracker.push([Xpos,60,i]);
+ctx.fillStyle=rgbToHex(0,0,0);
+ctx.fillRect(Xpos+10,60+80+10,5,5);
+ctx.font="8px sans-serif";
+ctx.fillText('Delete Pole',Xpos+5,60+80+5);
+KillRect.push([Xpos+10,60+80+10,i]);
+
+ctx.fillRect(Xpos+10,65,5,5);
+ctx.font="8px sans-serif";
+ctx.fillText('Input Value',Xpos+10,80);
+InputRect.push([Xpos+10,65,i]);
+
+
+}
+//Leftx is ColorBar.pole(0),Rightx = ColorBar.pole(1)
+}
+}
+
+//Now draw the spectrum on the bottom
+//each pixel is a step
+for(var i=0;i<BarRange;i++){
+var PsentAlong=i/BarRange;
+
+ 
+var Value=OurBar.polevalue[0]+(OurBar.polevalue[1]-OurBar.polevalue[0])*PsentAlong;
+ if(BinMe){
+ Value=MakeBin(Value);
+ }
+
+ ctx.strokeStyle=OurBar.GetColor(Value);
+ ctx.beginPath();
+ ctx.moveTo(LeftX+i,170);
+ ctx.lineTo(LeftX+i,200);
+ ctx.stroke();
+ if(i%10==0){
+ ctx.save();
+ ctx.translate(ctx.canvas.width , 0);
+ ctx.rotate(Math.PI/2);
+ ctx.font=10+"px sans-serif"; //COME BACK
+ ctx.fillText(Math.round(Value*100)/100,150,-LeftX-i+ctx.canvas.width);
+ ctx.restore();
+ //Rotate canvas, write Value, Rotate back
+ }
+ 
+
+}
+  ctx.save();
+ ctx.translate(ctx.canvas.width , 0);
+ ctx.rotate(Math.PI/2);
+ ctx.font=10+"px sans-serif";
+ ctx.fillText(Math.round(Value*100)/100,150,-LeftX-i+ctx.canvas.width);
+ ctx.restore();
+}
+
+
+
+
+ColorBar=function(){
+this.max=100;
+this.min=0;
+this.fixed=['p','p'];
+//this.range=(Max-Min)||0;
+this.pole=[this.min,this.max]; //this holds the set of all pole values. value listed here is %
+this.polevalue=[0,100]; //numerical poll value, first is min, second is max, all others is specifc number
+this.polecolor=[[0,0,255],[255,0,0]]; //this holds the color value (r,g,b) of each pole. Indexes should line up. pollcolor[0] corrosponds to pole[0]
+};
+ColorBar.prototype.GetColor=function(value){
+//find the two poles this value lies between, or the pole it lies on. Return the color
+var CurrentBottom=0;
+var CurrentTop=1;
+for(var i=0; i<this.pole.length; i++){
+if(this.polevalue[i]==value){
+CurrentBottom=i;
+CurrentTop=i;
+break
+}
+if((this.polevalue[i]<value)&&(this.pole[i]>this.pole[CurrentBottom])){
+CurrentBottom=i;
+}
+if((this.polevalue[i]>value)&&(this.pole[i]<this.pole[CurrentTop])){
+CurrentTop=i;
+}
+
+}
+if(CurrentTop==CurrentBottom){
+return rgbToHex(this.polecolor[CurrentBottom][0],this.polecolor[CurrentBottom][1],this.polecolor[CurrentBottom][2]);
+}
+else{ 
+//know value is between this.pole[CurrentBottom] and this.pole[CurrentTop] 
+//know the color of this.polecolor[CurrentBottom] and this.polecolor[CurrentTop]
+var PercentAlong=(value-this.polevalue[CurrentBottom])/(this.polevalue[CurrentTop]-this.polevalue[CurrentBottom]);
+
+var RedDif=this.polecolor[CurrentTop][0]-this.polecolor[CurrentBottom][0];
+var GreenDif=this.polecolor[CurrentTop][1]-this.polecolor[CurrentBottom][1];
+var BlueDiff=this.polecolor[CurrentTop][2]-this.polecolor[CurrentBottom][2];
+var R = Math.floor(this.polecolor[CurrentBottom][0]+RedDif*PercentAlong);
+var G = Math.floor(this.polecolor[CurrentBottom][1]+GreenDif*PercentAlong);
+var B = Math.floor(this.polecolor[CurrentBottom][2]+BlueDiff*PercentAlong);
+//console.log(PercentAlong,RedDif,R);
+return rgbToHex(R,G,B);
+}
+
+};
+
+ColorBar.prototype.AddPole=function(){
+
+var Color=[100,100,100];
+
+this.pole.push(50);
+this.fixed.push('p');
+this.polevalue.push((this.polevalue[1]+this.polevalue[0])/2);
+this.polecolor.push(Color);
+};
+
+ColorBar.prototype.DeletePole=function(index){
+if(index>1){
+if(index<this.pole.length){
+this.pole.splice(index,1);
+this.polecolor.splice(index,1);
+this.polevalue.splice(index,1);
+this.fixed.splice(index,1);
+}
+}
+};
+ColorBar.prototype.UpdatePoles=function (MIN,MAX){
+this.min=MIN;
+this.max=MAX;
+
+var pole=[0,100];
+var value=[MIN,MAX];
+var range=MAX-MIN;
+for(var i=2;i<this.fixed.length;i++){
+if(this.fixed[i]=='p'){
+pole.push(this.pole[i]);
+value.push(this.min+this.pole[i]*range/100);
+
+}
+if(this.fixed[i]=='v'){
+pole.push((this.polevalue[i]-this.min)/range *100);
+value.push(this.polevalue[i]);
+}
+
+}
+this.pole=pole;
+this.polevalue=value;
+
+
+
+};
+
+
+ColorBar.prototype.UpdatePolePercent=function (MIN,MAX){
+this.min=MIN;
+this.max=MAX;
+
+
+this.pole=[];
+var range=MAX-MIN;
+for (var i=0;i<this.polevalue.length; i++){
+this.pole.push((this.polevalue[i]-this.min)/range *100)
+
+}
+
+};
+
+ColorBar.prototype.UpdatePoleValue=function (MIN,MAX){
+this.min=MIN;
+this.max=MAX;
+
+
+this.polevalue=[];
+var range=MAX-MIN;
+for (var i=0;i<this.pole.length; i++){
+this.polevalue.push(this.min+this.pole[i]*range/100);
+}
+/*
+this.polevalue[0]=MIN;
+this.polevalue[1]=MAX;*/
+};
+
+OurBar=new ColorBar(0,100);
+OurBar.AddPole();
+OurBar.polecolor[2]=[255,255,255];
+
+
+
+
+
+
+function PopUseTable(){
+Selected={'type':'none','data':[]};
+if(ShowCsvId){
+var PRowHeaders=[];
+for(var i=0;i<RowHeaders.length;i++){
+PRowHeaders.push(RowHeaders[i]+'\t\t\t'+String(i+2));
+}
+var PColHeaders=[];
+for(var i=0;i<ColumnHeaders.length;i++){
+PColHeaders.push(ColumnHeaders[i]+'\t\t\t'+String(i+2));
+}
+
+
+}
+else{
+var PRowHeaders=RowHeaders;
+var PColHeaders=ColumnHeaders;
+}
+ 
+ 
+ if (RowLimiter.length==0){
+ var TempTable=DataTable;
+  UseRowHeaders=PRowHeaders;
+ }
+ else{
+ if((Math.sign(RowLimiter[0])==-1) || (Math.atan2(0,Math.sign(RowLimiter[0]))==Math.PI)){ //checking for +0 or -0
+  var TempTable=[];
+   UseRowHeaders=[];
+
+  for(var i=0;i<PRowHeaders.length;i++){
+ if (RowLimiter.indexOf(-i)==-1){
+ TempTable.push(DataTable[i]);
+ UseRowHeaders.push(PRowHeaders[i]);
+ }
+  }
+ 
+  
+ }
+ else{
+ 
+  var TempTable=[];
+   UseRowHeaders=[];
+ for(var i=0;i<RowLimiter.length;i++){
+ if(typeof PRowHeaders[RowLimiter[i]]!=='undefined'){
+ TempTable.push(DataTable[RowLimiter[i]]);
+ UseRowHeaders.push(PRowHeaders[RowLimiter[i]]);}
+ } 
+ }
+ }
+if(ColumnLimiter.length==0){
+
+ UseTable=TempTable;
+ UseColumnHeaders=PColHeaders;
+}
+else{
+ if((Math.sign(ColumnLimiter[0])==-1 )||(Math.atan2(0,Math.sign(ColumnLimiter[0]))==Math.PI)){
+   UseTable=[];
+    UseColumnHeaders=[];
+
+  for(var i=0; i<TempTable.length;i++){
+    var row=[];
+  for(var j=0;j<PColHeaders.length;j++){
+
+ if (ColumnLimiter.indexOf(-j)==-1){
+ row.push(TempTable[i][j]);
+ }
+
+  }
+   if(row.length!=0){
+ UseTable.push(row);
+ 
+ }
+  }
+ for(var j=0;j<PColHeaders.length;j++){
+ if (ColumnLimiter.indexOf(-j)==-1){
+ UseColumnHeaders.push(PColHeaders[j]);
+ }
+ }
+  
+ }
+ else{
+
+
+
+ UseTable=[];
+ UseColumnHeaders=[];
+ for(var j=0;j<TempTable.length;j++){
+  row=[];
+for(var i=0;i<ColumnLimiter.length;i++){
+if(typeof PColHeaders[ColumnLimiter[i]]!=='undefined'){
+row.push(TempTable[j][ColumnLimiter[i]])
+}
+
+ 
+ }
+ if(row.length!=0){
+ UseTable.push(row);
+ }
+ 
+ }
+ for(var i=0;i<ColumnLimiter.length;i++){
+if(typeof PColHeaders[ColumnLimiter[i]]!=='undefined'){
+ UseColumnHeaders.push(PColHeaders[ColumnLimiter[i]]);}
+ }
+
+}
+}
+
+
+DrawHeatMap();
+}
+
+
+
+
+
+
+function DrawKey(context){
+
+///////
+
+ ////////
+ 
+if(UseTable.length>0){
+
+
+if(!(BinMe&&BinKey)){
+ MAX=parseFloat(UseTable[0][0]);
+  MIN=parseFloat(UseTable[0][0]);
+for(var i=0;i<UseRowHeaders.length;i++){
+for(var j=0;j<UseColumnHeaders.length;j++){
+ if(!isNaN(parseFloat(UseTable[i][j]))  ){
+ if(isNaN(MAX)){
+  MAX=parseFloat(UseTable[i][j]);
+  MIN=parseFloat(UseTable[i][j]);
+ }
+ 
+ MAX=Math.max(MAX,parseFloat(UseTable[i][j]));
+ MIN=Math.min(MIN,parseFloat(UseTable[i][j]));
+ }
+ }}
+ }
+ else{
+ MIN=BinValues[0]-BinStep;
+ MAX=BinValues[BinValues.length-1]+BinStep;
+ }
+
+ RANGE=MAX-MIN;
+ OurBar.UpdatePoles(MIN,MAX);
+
+ //OK blue at MIN, Red at max.
+ 
+
+
+  context.font="10px sans-serif";
+  var Xpos=0;
+  var Leap=1;
+  var NumberofSteps=135;
+  var OY=-NumberofSteps
+ for(var i=0;i<NumberofSteps;i++){
+ //Translate i to RANGE so i=0 = MIN, i=100 = MAX
+ if(BinMe){
+ var Value=MakeBin(MIN+RANGE/NumberofSteps*i);
+ }
+ else{
+ var Value=MIN+RANGE/NumberofSteps*i;
+ }
+ 
+ //console.log(MIN);
+ 
+  var Ypos=i*Leap+10;
+  
+  if(Ypos-OY>10){
+  OY=Ypos;
+   context.fillStyle=rgbToHex(0, 0, 0);
+  
+   context.fillText(Math.round(Value*100)/100,Xpos+10,Ypos);
+  }
+  
+ context.strokeStyle=OurBar.GetColor(Value);
+   context.beginPath();
+ context.moveTo(Xpos,Ypos);
+ context.lineTo(Xpos+10,Ypos);
+ context.stroke();
+ //context.fillRect(Xpos,Ypos,10,Leap);
+  
+
+
+ 
+ }
+}
+ }
+ ShowCsvId=false;
+ function handleClick(cb) {
+  ShowCsvId=cb.checked;
+  PopUseTable();
+}
+
+GloCell=15;
+function SetSize(){
+var Temp=prompt("set the cell size",GloCell);
+if(!isNaN(parseInt(Temp))){
+GloCell=parseInt(Temp);
+ MinCell=GloCell;
+DrawHeatMap();
+}
+}
+
+
+function changeDPI(){
+DefaultDPI=parseInt(prompt('Change DPI for High res image',DefaultDPI));
+
+}
+
+DefaultDPI=600;
+function SaveHeatmapAsImageHighDPI(){
+if(typeof DataTable !== 'undefined'){
+BigPicture=document.createElement('canvas');
+
+BContext=BigPicture.getContext('2d');
+
+
+ var NumRows=UseRowHeaders.length;
+ var NumColumns=UseColumnHeaders.length;
+  //assuming MinCell is already defined
+var TempRowArray=[];
+var W=0;
+var H=0;
+
+ BContext.font=MinCell+"px sans-serif";
+ for(var p=0;p<NumRows;p++){
+ W=Math.max(W, BContext.measureText(UseRowHeaders[p]).width);
+  }
+   for(var p=0;p<NumColumns;p++){
+ H=Math.max(H, BContext.measureText(UseColumnHeaders[p]).width);
+  }
+  
+  
+BigPicture.height=H+NumRows*MinCell;
+
+BigPicture.width=W+NumColumns*MinCell;
+setDPI(BigPicture, DefaultDPI);
+
+
+ BContext.save();
+ BContext.translate(BigPicture.width , 0);
+ BContext.rotate(Math.PI/2);
+
+  
+
+ 
+ for(var p= 0; p<NumColumns;p++){
+ var text = BContext.measureText(UseColumnHeaders[p]);
+  
+ 
+ BContext.fillText(UseColumnHeaders[p],H-text.width,BigPicture.width-(p)*MinCell-W);
+ }
+BContext.restore();
+
+
+
+ for(var p= 0; p<NumRows;p++){
+ //console.log(UseRowHeaders[p]);
+ 
+ 
+ 
+ var text = BContext.measureText(UseRowHeaders[p]);
+
+ BContext.fillText(UseRowHeaders[p],W-text.width,(p+1)*MinCell-3+H);
+ }
+
+for(var C=0;C<NumColumns;C++){
+ var Xpos=W+C*MinCell;
+ for(var R=0;R<NumRows;R++){
+ var Ypos=H+R*MinCell;
+
+  var Value=parseFloat(UseTable[R][C]);
+ 
+  if(!isNaN(Value)  ){
+ BContext.fillStyle=OurBar.GetColor(Value);}
+ else{
+ BContext.fillStyle=rgbToHex(255,255, 255);
+ }
+ BContext.fillRect(Xpos,Ypos,MinCell,MinCell);
+ }
+
+
+}
+
+console.log(BigPicture.height,BigPicture.width);
+ link=document.createElement("a");
+link.download='Heatmap.png';
+link.href=BigPicture.toDataURL("image/png");
+link.click();
+//Display.appendChild(BigPicture);
+//javascript:void(window.open().location = BigPicture)
+BigPicture.remove()
+}
+}
+
+
+
+
+function ExportSvg(){
+if(typeof(UseTable)!=='undefined'){
+ var BODY=document.getElementById('exportingSVG');
+var BBB=BODY.cloneNode(false);
+BODY.parentNode.replaceChild(BBB ,BODY);
+
+
+
+var ancestor = document.getElementById('Display');
+ var descendents = ancestor.getElementsByTagName('div');
+ 
+ var Yhi=0
+for(var i=0; i<descendents.length; i++){
+ Canvases = descendents[i].getElementsByTagName('canvas');
+ var Xwid=0
+for(var j=0;j<Canvases.length;j++){
+Xwid=Xwid+Canvases[j].width;
+}
+Yhi=Yhi+Canvases[0].height;
+}
+ exportingSVG.setAttribute('width',Xwid);
+  exportingSVG.setAttribute('height',Yhi);
+
+exportingSVG.style.visibility='visible';
+
+
+
+ var NumRows=UseRowHeaders.length;
+ var NumColumns=UseColumnHeaders.length;
+  //assuming MinCell is already defined
+var TempRowArray=[];
+var W=0;
+var H=0;
+
+
+for(var i=0;i<UseRowHeaders.length;i++){
+var ROWNAMES=document.createElementNS('http://www.w3.org/2000/svg', 'text');
+ROWNAMES.setAttribute('class','Heatmap');
+ROWNAMES.setAttribute('style','font-size:'+MinCell+'; font-weight:bold;');
+ROWNAMES.textContent=UseRowHeaders[i];
+exportingSVG.appendChild(ROWNAMES);
+var bbox=ROWNAMES.getComputedTextLength();
+TempRowArray.push(ROWNAMES);
+W=Math.max(W,bbox);
+  }
+  var TempColArray=[];
+for(var i=0;i<UseColumnHeaders.length;i++){
+var ROWNAMES=document.createElementNS('http://www.w3.org/2000/svg', 'text');
+ROWNAMES.setAttribute('class','Heatmap');
+ROWNAMES.setAttribute('style','font-size:'+MinCell+'; font-weight:bold; position:fixed;');
+ROWNAMES.textContent=UseColumnHeaders[i];
+exportingSVG.appendChild(ROWNAMES);
+Mbbox=ROWNAMES.getComputedTextLength();
+H=Math.max(H,Mbbox);
+TempColArray.push(ROWNAMES);
+}
+var RowStart=H;
+var ColStart=W;
+for(var i=0;i<TempRowArray.length;i++){
+var bbox=TempRowArray[i].getComputedTextLength();
+var ww=bbox
+TempRowArray[i].setAttribute('x',ColStart-ww);
+TempRowArray[i].setAttribute('y',RowStart+MinCell*(i+1));
+}
+for(var i=0;i<TempColArray.length;i++){
+var bbox=TempColArray[i].getBBox();
+TempColArray[i].setAttribute('transform','rotate(-90 0 0)');
+TempColArray[i].setAttribute('y',ColStart+MinCell*(i)+6*MinCell/8);
+TempColArray[i].setAttribute('x',-RowStart);
+}
+
+for(var i=0;i<TempRowArray.length;i++){
+
+var Ypos=RowStart+MinCell*i;
+for(var j=0; j<TempColArray.length;j++){
+var Xpos=ColStart+MinCell*(j);
+Cell=document.createElementNS("http://www.w3.org/2000/svg", "rect");
+Cell.setAttributeNS(null,'x',Xpos);
+Cell.setAttributeNS(null,'y',Ypos);
+Cell.setAttributeNS(null,'height',MinCell);
+Cell.setAttributeNS(null,'width',MinCell);
+var Value=parseFloat(UseTable[i][j]);
+if(!isNaN(Value)  ){
+Cell.setAttributeNS(null,'style','fill:'+OurBar.GetColor(Value)+';');
+}
+ else{
+Cell.setAttributeNS(null,'style','fill:white;');
+ }
+ Cell.setAttribute('class','Heatmap');
+ exportingSVG.appendChild(Cell);
+  
+  }
+}
+
+
+//Credit goes to defghi1977 at
+//http://stackoverflow.com/questions/23218174/how-do-i-save-export-an-svg-file-after-creating-an-svg-with-d3-js-ie-safari-an
+
+var serializer = new XMLSerializer();
+var source = serializer.serializeToString(exportingSVG);
+if(!source.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)){
+    source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+}
+if(!source.match(/^<svg[^>]+"http\:\/\/www\.w3\.org\/1999\/xlink"/)){
+    source = source.replace(/^<svg/, '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
+}
+source = '<?xml version="1.0" standalone="no"?>\r\n' + source;
+var url = "data:image/svg+xml;charset=utf-8,"+encodeURIComponent(source);
+
+link=document.createElement("a");
+link.download='Heatmap.svg';
+link.href=url;
+link.click();
+exportingSVG.style.visibility='hidden';
+}
+}
+
+ function DrawHeatMap(){
+ 
+ if(typeof DataTable !== 'undefined'){
+ var BODY=document.getElementById('Display');
+var BBB=BODY.cloneNode(false);
+BODY.parentNode.replaceChild(BBB ,BODY);
+
+ var BODY=document.getElementById('Stores');
+var BBB=BODY.cloneNode(false);
+BODY.parentNode.replaceChild(BBB ,BODY);
+
+ 
+
+ 
+ var NumRows=UseRowHeaders.length;
+
+
+ var NumColumns=UseColumnHeaders.length;
+ 
+ if(ShowNums.checked==true){
+  MinCell=Math.max(GloCell,30);
+ MaxWidth=333*15; 
+ MaxHeight=333*15;
+  //MaxWidth=60;
+// MaxHeight=60;
+  }
+  else{
+  MinCell=GloCell;
+   //MaxWidth=60; 
+ //MaxHeight=60;
+ MaxWidth=333*MinCell; 
+MaxHeight=333*MinCell;
+  }
+ //note should be dividible by MinCell
+
+ 
+ //Calculate number of columns of canvases to use:
+NumCanvCol=Math.floor(NumColumns*MinCell/MaxWidth)+1; //Number of max width columns needed
+LastWidth=NumColumns*MinCell%MaxWidth;
+
+NumColPerMaxCanv=MaxWidth/MinCell;
+
+NumCanvRow=Math.floor(NumRows*MinCell/MaxHeight)+1; 
+LastHeighth=NumRows*MinCell%MaxHeight;
+NumRowPerMaxCanv=MaxHeight/MinCell;
+//so to get which i.e. row of the datatable we are in
+//given we are in canvas row i, we do
+//loop: for(var spec=Math.floor((i - 1))*NumRowPerMaxCanv;spec<Math.floor((i - 1))*NumRowPerMaxCanv+NumRowPerMaxCanv;spec++) 
+
+  width=150;
+  height=150;
+
+  
+  //Need a way to convert from i,j to numbers of the datatable
+  //i=1,j=1 is the first block of data entries
+  
+  
+RowClickTable=[]; //Stores {CanvRow: Int, DataRow:Int (from use table), Last Y Coordinate}
+ColClickTable=[];
+  
+Body=document.getElementById('Display');
+Body.setAttribute('style',"padding:0;font-size:0;")
+
+ ColToHighlight=[];
+  RowToHighlight=[];
+if (Selected.type=='col' || Selected.type=='cell'){
+  if (Selected.type=='col'){
+ ColToHighlight=Selected.data;
+ }
+ else{
+ ColToHighlight=[];
+ for(var t=0;t<Selected.data.length;t++){
+ ColToHighlight.push(Selected.data[t][1]);
+ }
+ }
+ }
+  else{
+ ColToHighlight=[];}
+ if (Selected.type=='row' || Selected.type=='cell'){
+  if (Selected.type=='row'){
+ RowToHighlight=Selected.data;
+ }
+ else{
+ RowToHighlight=[];
+ for(var t=0;t<Selected.data.length;t++){
+ RowToHighlight.push(Selected.data[t][0]);
+ }
+ }
+ }
+  else{
+ RowToHighlight=[];}
+
+
+
+
+
+
+
+for(var i=0; i<NumCanvRow+1;i++){
+var ROW=document.createElement("div");
+  ROW.setAttribute('style',"white-space: nowrap; margin: 0;");
+  ROW.id='Row_'+i;
+  Body.appendChild(ROW); 
+for(var j=0; j<NumCanvCol+1; j++){
+if((i==0)&&(j==0)){ //In top left canvas, place key here get width and height
+ var Canv=document.createElement("canvas");
+Canv.className='under';
+
+ var context = Canv.getContext("2d");
+context.font=MinCell+"px sans-serif";
+ 
+ for(var p=0;p<NumRows;p++){
+ width=Math.max(width, context.measureText(UseRowHeaders[p]).width);
+  }
+   for(var p=0;p<NumColumns;p++){
+ height=Math.max(height, context.measureText(UseColumnHeaders[p]).width);
+  }
+  Canv.width = width;
+ Canv.height=height;
+  var Front=document.createElement("canvas");
+Front.className='FrontC';
+ Front.width=width;
+ Front.height=height;
+
+  var ShowCanv=document.createElement("canvas");
+ShowCanv.className='Disp';
+ ShowCanv.width=width;
+ ShowCanv.height=height;
+ DrawKey(context);
+}
+else if((i==0)&&(j!=0)){ //On top row, place labels for columns (with rotation and such)
+ var Canv=document.createElement("canvas");
+ Canv.className='under';
+ var context = Canv.getContext("2d");
+ var LocalWidth=MaxWidth;
+if(j==NumCanvCol){
+ LocalWidth=LastWidth;
+}
+ Canv.width = LocalWidth;
+ Canv.height=height;
+   var Front=document.createElement("canvas");
+Front.className='FrontC';
+ Front.width=LocalWidth;
+ Front.height=height;
+   var ShowCanv=document.createElement("canvas");
+ShowCanv.className='Disp';
+ ShowCanv.width=LocalWidth;
+ ShowCanv.height=height;
+ var StartCap=Math.floor((j-1))*NumColPerMaxCanv;
+
+ 
+ context.save();
+ context.translate(Canv.width , 0);
+ context.rotate(Math.PI/2);
+ context.font=MinCell+"px sans-serif";
+  console.log(MinCell);
+
+ 
+ for(var p= StartCap; p<Math.min(StartCap+NumColPerMaxCanv,NumColumns);p++){
+ //console.log(UseColumnHeaders[p]);
+ 
+
+
+ var text = context.measureText(UseColumnHeaders[p]);
+  if (ColToHighlight.indexOf(p)!=-1){
+  context.fillStyle='blue';
+  context.fillRect(0,Canv.width-(p-StartCap+1)*MinCell,Canv.height,MinCell);
+  context.fillStyle='white';
+ context.fillText(UseColumnHeaders[p],Canv.height-text.width,Canv.width-(p-StartCap)*MinCell);
+ context.fillStyle='black';
+ }
+ else{
+ context.fillText(UseColumnHeaders[p],Canv.height-text.width,Canv.width-(p-StartCap)*MinCell);
+ }
+ }
+context.restore();
+
+}
+else if((j==0)&&(i!=0)){ //In first column, place row labels
+ var Canv=document.createElement("canvas");
+ Canv.className='under';
+ var context = Canv.getContext("2d");
+ var LocalHeight=MaxHeight;
+if(i==NumCanvRow){
+LocalHeight=LastHeighth;
+}
+ Canv.width = width;
+ Canv.height=LocalHeight;
+    var Front=document.createElement("canvas");
+Front.className='FrontC';
+ Front.width=width;
+ Front.height=LocalHeight;
+    var ShowCanv=document.createElement("canvas");
+ShowCanv.className='Disp';
+ ShowCanv.width=width;
+ ShowCanv.height=LocalHeight;
+ var StartCap=Math.floor((i-1))*NumRowPerMaxCanv;
+  context.font=MinCell+"px sans-serif";
+ for(var p= StartCap; p<Math.min(StartCap+NumRowPerMaxCanv,NumRows);p++){
+ //console.log(UseRowHeaders[p]);
+ 
+ 
+ 
+ var text = context.measureText(UseRowHeaders[p]);
+   if (RowToHighlight.indexOf(p)!=-1){
+  context.fillStyle='blue';
+  context.fillRect(0,(p-StartCap)*MinCell-3,Canv.width,MinCell);
+  context.fillStyle='white';
+ context.fillText(UseRowHeaders[p],Canv.width-text.width,(p-StartCap+1)*MinCell-3);
+ context.fillStyle='black';
+ }
+ else{
+
+ context.fillText(UseRowHeaders[p],Canv.width-text.width,(p-StartCap+1)*MinCell-3);
+ }
+ 
+ 
+ 
+ }
+ 
+//console.log('mememe');
+}
+
+
+else{//In one of the interior canvases, build heatmap
+//console.log('mememe');
+ var Canv=document.createElement("canvas");
+ Canv.className='under';
+
+ var context = Canv.getContext("2d");
+ var LocalHeight=MaxHeight;
+  var LocalWidth=MaxWidth;
+  if(j==NumCanvCol){
+ LocalWidth=LastWidth;
+}
+if(i==NumCanvRow){
+LocalHeight=LastHeighth;
+}
+
+ Canv.width = LocalWidth;
+ Canv.height=LocalHeight;
+ var Front=document.createElement("canvas");
+Front.className='FrontC';
+ Front.width=LocalWidth;
+ Front.height=LocalHeight;
+    var ShowCanv=document.createElement("canvas");
+	    var Front=document.createElement("canvas");
+Front.className='FrontC';
+ Front.width=LocalWidth;
+ Front.height=LocalHeight;
+ 
+ShowCanv.className='Disp';
+ ShowCanv.width=LocalWidth;
+ ShowCanv.height=LocalHeight;
+
+var StartRow=Math.floor((i-1))*NumRowPerMaxCanv;
+ var StartCol=Math.floor((j-1))*NumColPerMaxCanv;
+
+//console.log(StartRow,StartCol);
+
+for(var C= StartCol; C<Math.min(StartCol+NumColPerMaxCanv,NumColumns);C++){
+ var Xpos=(C-StartCol)*MinCell;
+ ColClickTable.push({'CanvCol':j,'DatCol':C,'LastX':Xpos})
+}
+
+ for(var R= StartRow; R<Math.min(StartRow+NumRowPerMaxCanv,NumRows);R++){
+  var Ypos=(R-StartRow)*MinCell;
+ RowClickTable.push({'CanvRow':i,'DatRow':R,'LastY':Ypos});
+ 
+
+ for(var C= StartCol; C<Math.min(StartCol+NumColPerMaxCanv,NumColumns);C++){
+
+ //DataTable Row R and Column C
+ //console.log(StartRow,StartCol,R,C);
+ 
+ var Xpos=(C-StartCol)*MinCell;
+
+
+
+ var Value=parseFloat(UseTable[R][C]);
+ 
+
+
+//console.log(Value,Value-1,RANGE,MIN);
+//var RED=Math.floor((255/RANGE)*(Value-MIN));
+//var BLUE=Math.floor((255/RANGE)*(RANGE-(Value-MIN)));
+// var R=Math.floor((255/RANGE)*(Value-MIN));
+//var  B=Math.floor((255/RANGE)*(RANGE-(Value-MIN)));
+ // console.log(R,B);
+
+ 
+ 
+  if(!isNaN(Value)  ){
+  
+ context.fillStyle=OurBar.GetColor(Value);}
+ else{
+ context.fillStyle=rgbToHex(255,255, 255);
+ }
+ 
+ 
+context.fillRect(Xpos,Ypos,MinCell,MinCell);
+if((ShowNums.checked==true)&&(!isNaN(Value) )){
+//context.font='8px Arial';
+context.strokeStyle=rgbToHex(0,0, 0);
+context.lineWidth=2;
+context.strokeText(Value,Xpos,Ypos+10);
+context.fillStyle=rgbToHex(255,255,255);
+context.fillText(Value,Xpos,Ypos+10);
+
+}
+if (RowToHighlight.indexOf(R)!=-1 || ColToHighlight.indexOf(C)!=-1){
+context.strokeStyle=rgbToHex(0,0, 0);
+context.rect(Xpos,Ypos,MinCell,MinCell);
+context.stroke();
+}
+
+ }
+ 
+ }
+
+}
+ShowCanv.id=i+','+j;
+Canv.id='Back_'+i+','+j;
+Front.id='Front_'+i+','+j;
+  //Stores {CanvRow: Int, DataRow:Int (from use table), Last Y Coordinate}
+
+  
+  ShowCanv.addEventListener('mousedown', function(evt) {
+
+  var rect = this.getBoundingClientRect();
+  var x = evt.clientX - rect.left;
+  var y = evt.clientY - rect.top;
+  
+
+  
+  var TempClick=GetClickedRowCol(this,x,y);
+  
+  /*possibilities:
+  
+  temp=none: Do nothing
+  selected=none, temp=anything, Selected =temp highlight clicked is true
+  selected=row/col, temp = same (no ctrl)-check if temp is already clicked if not make selected=temp. else highligh clicked=true
+selected=row/col, temp = opposite (no ctrl) - selected=temp
+selected=row/col, temp = cell (no ctrl) - check if cell in row/col, if so highlight clicked=true, else selected=temp
+selected=cell, temp=row/col: selected=temp
+  , if not check for ctrl
+  
+  
+  */
+  
+	if(Selected.type=='none'){ //no highlight currently
+  Selected=TempClick;
+  }
+  else if (Selected.type==TempClick.type){
+  if(Selected.data.indexOf(TempClick.data[0])==-1 ){
+  if(evt.ctrlKey){
+  Selected.data.push(TempClick.data[0]);
+  }
+  else if(evt.shiftKey){
+  if(Selected.type!='cell'){
+  var min=Selected.data[0];
+  var max=Selected.data[0];
+  for(var i=0;i<Selected.data.length;i++){
+  min=Math.min(min,Selected.data[i]);
+  max=Math.max(max,Selected.data[i]);
+  }
+  min=Math.min(min,TempClick.data[0]);
+  max=Math.max(max,TempClick.data[0]);
+  Selected.data=range(min,(max-min)+1);
+  }
+  else{
+  Selected.data.push(TempClick.data[0]);
+  
+  }
+  
+  }
+  
+  else{
+  Selected=TempClick;
+  }
+  
+  }
+  
+  }
+  else if(TempClick.type=='cell'){
+  	var IndexTocheck=1;
+	if (Selected.type=='Col'){
+	IndexTocheck=0;
+	}
+	//console.log(TempClick.data[0],IndexTocheck,Selected.data);
+	if(Selected.data.indexOf(TempClick.data[0][IndexTocheck])==-1 ){
+	Selected=TempClick;
+	}
+  
+  }
+  else {
+    Selected=TempClick;
+  
+  }
+
+
+  
+  
+
+  if (Selected.type!='none'){
+  HighlightClicked=true;
+
+  NewHightlightPos=GetPos(this,x,y);
+  OrigHighlightPos=NewHightlightPos;
+  //console.log(NewHightlightPos);
+  }
+  //console.log(Selected);
+  DrawHeatMap();
+  });
+  
+ 
+
+ShowCanv.addEventListener('mousemove', function(evt) {
+if(HighlightClicked){
+  var rect = this.getBoundingClientRect();
+  var x = evt.clientX - rect.left;
+  var y = evt.clientY - rect.top;
+  var TempCoords=GetPos(this,x,y);
+  if((TempCoords[0]!=NewHightlightPos[0]) || (TempCoords[1]!=NewHightlightPos[1])){
+  NewHightlightPos=TempCoords;
+  DrawHelper(this);
+  }
+ // console.log(this.id);
+//console.log(NewHightlightPos);
+}
+  
+  });
+
+ 
+ ShowCanv.addEventListener('mouseup', function(evt) {
+ if(HighlightClicked){
+ 
+ if(OrigHighlightPos[0]!=NewHightlightPos[0] || OrigHighlightPos[1]!=NewHightlightPos[1]){
+ ReorderUseTable();
+ DrawHeatMap();}
+ 
+ 
+ HighlightClicked=false;
+ }
+ 
+ 
+  
+  });
+  
+ //var CanvBox=document.createElement("div");
+//  CanvBox.setAttribute('style',"margin: 0; height:auto; width:auto; display:inline-block;");
+ // CanvBox.appendChild(Canv);
+ //ROW.appendChild(CanvBox); 
+ var showcontext=ShowCanv.getContext('2d');
+ showcontext.drawImage(Canv,0,0);
+
+ Stores.appendChild(Canv);
+ Stores.appendChild(Front);
+ROW.appendChild(ShowCanv);
+}
+
+
+}
+
+
+
+}
+}
+
+
+
+ function range(start, count) { //Thanks to user jflood.net at http://stackoverflow.com/questions/3895478/does-javascript-have-a-method-like-range-to-generate-an-array-based-on-suppl
+        return Array.apply(0, Array(count))
+                    .map(function (element, index) { 
+                             return index + start;  
+                         });
+    }
+
+
+
+
+window.onkeydown=function(evt){
+
+
+if(evt.keyCode=='46'){
+if(Selected.type!='none'){
+HideSelected();
+//console.log('Hide selected');
+}
+
+
+}
+
+}
+
+
+
+
+ 
+ HighlightClicked=false
+RawData=[];
+RowHeaders=[];
+ColumnHeaders=[];
+
+ 
+function handleFileSelect(evt) {
+if(evt.target.files.length>0){
+MultiFile.style.visibility='hidden';
+var BODY=document.getElementById('Display');
+var BBB=BODY.cloneNode(false);
+BODY.parentNode.replaceChild(BBB ,BODY);
+
+
+ RowHeaders=[];
+ ColumnHeaders=[];
+ RawData=[];
+    f = evt.target.files[0]; // FileList object
+	console.log(file);
+	reader = new FileReader();
+
+	
+	
+	reader.onload = function(e){
+	
+	 contents = e.target.result.split('\r');
+	 
+	 /*
+	 ColLabels=0;
+	RowNames=0;
+	RowData=1;
+	ColData=1;*/
+	 var FirstRow=0;
+	 
+	for(var i=ColLabels; i<contents.length; i++){
+	
+	
+	
+	
+	
+	
+	//Code taken from
+	
+	//**********************************http://stackoverflow.com/questions/11456850/split-a-string-by-commas-but-ignore-commas-within-double-quotes-using-javascript
+	var TmpString=contents[i].replace(',',"'',");
+	var arr = TmpString.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
+	
+	//contents[i].match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
+/* will match:
+
+    (
+        ".*?"       double quotes + anything but double quotes + double quotes
+        |           OR
+        [^",]+    1 or more characters excl. double quotes, comma or spaces of any kind
+    )
+    (?=             FOLLOWED BY
+        \s*,        0 or more empty spaces and a comma
+        |           OR
+        \s*$        0 or more empty spaces and nothing else (end of string)
+    )
+
+*/
+arr = arr || [];
+// this will prevent JS from throwing an error in
+// the below loop when there are no matches
+
+	var Cells = arr; 
+	//end stolen code***********************
+	//console.log(Cells);
+	if (Cells.length > 1){
+	
+	if(FirstRow==0){
+	FirstRow=1;
+	for(var j=0;j<RowNames;j++){
+	Cells.shift();
+	}
+//console.log(Cells.length);
+
+	Cells.shift();
+	ColumnHeaders=Cells;
+	}
+	
+	else{
+		for(var j=0;j<RowNames;j++){
+	Cells.shift();
+	}
+	//if(Cells.length>ColumnHeaders.length){
+	//console.log(Cells);
+	RowHeaders.push(Cells.shift().replace("''",""));
+	//}
+	//else{
+	//RowHeaders.push(' ')
+	//}
+	
+	RawData.push(Cells);
+	
+	
+	}
+	
+	}
+}
+
+	TranslateDataArray();
+
+	
+	}
+	
+	reader.readAsText(f);
+
+
+    // files is a FileList of File objects. List some properties.
+   }
+  }
+ 
+ 
+function GenerateBinValues(){
+BinValues=[];
+BinMin=-4;
+BinMax=4;
+BinStep=.25;
+BinRange=BinMax-BinMin;
+NumSteps=BinRange/BinStep;
+for(var i=0;i<=NumSteps;i++){
+BinValues.push(BinMin+(i*BinStep));
+}
+} 
+
+  
+function MakeBin(NumberHere){
+NumToBin=parseFloat(NumberHere);
+Binned=NaN;
+//if(NumToBin<=BinValues[0]){
+//Binned=BinValues[0];
+//}
+if(NumToBin>=BinValues[BinValues.length-1]){
+Binned=BinValues[BinValues.length-1]+BinStep;
+}
+else if(NumToBin<=BinValues[0]){
+Binned=BinValues[0]-BinStep;
+}
+
+
+
+else{
+for(var i=0;i<BinValues.length;i++){
+	if(NumToBin<=BinValues[i]){
+		Binned=BinValues[i];
+		if(i>0){//round to nearest bin
+		var Prev=BinValues[i-1];
+		if(Math.abs(NumToBin-Prev)<Math.abs(NumToBin-BinValues[i])){
+		Binned=BinValues[i-1];
+		}
+		}
+		//Binned=BinValues[i];
+		break
+	}
+}
+}
+
+
+
+//console.log(Binned);
+
+return Binned
+}  
+  
+  
+function TranslateDataArray(){
+DataTable=[];
+  
+
+for(var i=0;i<RawData.length;i++){
+DataTable.push(RawData[i].slice());
+}
+
+
+
+
+
+if(IsLog){
+for(var i=0;i<DataTable.length;i++){
+for(var j=0;j<DataTable[i].length;j++){
+if(parseFloat(DataTable[i][j])!=0){
+DataTable[i][j]=Math.log2(parseFloat(DataTable[i][j]));
+}
+else{
+DataTable[i][j]=NaN;
+console.log(parseFloat(DataTable[i][j]),DataTable[i][j],i,j)
+}
+}
+}
+}
+
+if(BinMe){
+for(var i=0;i<DataTable.length;i++){
+	for(var j=0;j<DataTable[i].length;j++){
+	var NN=MakeBin(DataTable[i][j]);
+	//console.log(NN);
+	DataTable[i][j]=NN;
+	}
+}
+}
+
+  	if(ColorOpen){
+	PopUseTable();
+	DrawCurrentBar(ColorContext);}
+	else{
+	PopUseTable();
+	
+	}
+ }
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+BinMe=true;
+BinKey=true;
+
+
+ function SwapBinKey(){
+ if(BinKey){
+ ToKey.checked=false;
+ BinKey=false;
+ }
+ else{
+ BinKey=true;
+ ToKey.checked=true;
+ }
+ TranslateDataArray();
+ }
+
+ function SwapBin(){
+ if(BinMe){
+ ToBin.checked=false;
+ BinMe=false;
+ }
+ else{
+ BinMe=true;
+ ToBin.checked=true;
+ }
+ TranslateDataArray();
+ }
+  
+function Swap(){
+ if(IsLog){
+ Logscale.checked=false;
+ IsLog=false;
+ }
+ else{
+ IsLog=true;
+ Logscale.checked=true;
+ }
+ TranslateDataArray();
+ }
+/*
+if(IsLog){
+console.log(IsLog);
+IsLog=false;
+Logscale.checked=false;
+DataTable=[];
+for(var i=0;i<RawData.length;i++){
+DataTable.push(RawData[i].slice());
+}
+
+}
+else{
+
+IsLog=true;
+if(DataTable.length>0){
+
+for(var i=0;i<DataTable.length;i++){
+
+for(var j=0;j<DataTable[i].length;j++){
+if(parseFloat(DataTable[i][j])!=0){
+DataTable[i][j]=Math.log2(parseFloat(DataTable[i][j]));
+}
+else{
+DataTable[i][j]=NaN;
+console.log(parseFloat(DataTable[i][j]),DataTable[i][j],i,j)
+}
+
+}
+}
+
+}
+}
+
+DrawHeatMap();
+if(typeof(ColorContext)!=='undefined'){
+DrawCurrentBar(ColorContext);
+}
+
+//if true want to convert from raw values to 2^raw value
+
+
+
+}*/
+Selected={'type':'none','data':[]};
+
+
+
+function HideSelected(){
+var RowsToBeHigh=[];
+var ColToBeHigh=[];
+var OrigUse=[];
+var OrigRowHeaders=[];
+for(var i=0;i<UseTable.length;i++){
+var Row=[];
+for(var j=0;j<UseTable[i].length;j++){
+Row.push(UseTable[i][j]);
+
+}
+OrigUse.push(Row.slice());
+OrigRowHeaders.push(UseRowHeaders[i]);
+}
+UseTable=[];
+UseRowHeaders=[];
+
+//console.log(OrigUse);
+var RowIndexes=[];
+if(Selected.type=='row' || Selected.type=='cell'){ //Take highlighted rows, Dont add them back to use table
+
+if(Selected.type=='cell'){
+for(var i=0;i<Selected.data.length;i++){
+RowIndexes.push(Selected.data[i][0]);
+}
+}
+else{
+RowIndexes=Selected.data;
+
+}
+}
+
+//console.log(RowIndexes, RowsToPack);
+
+for(var i=0; i<OrigUse.length;i++){
+if (RowIndexes.indexOf(i)==-1){
+//console.log('HereAlso',i,RowIndexes);
+UseTable.push(OrigUse[i].slice());
+UseRowHeaders.push(OrigRowHeaders[i]);
+}
+
+}
+
+
+
+//console.log(UseTable);
+
+var OrigUse=[];
+var OrigColHead=[];
+for(var i=0;i<UseTable.length;i++){
+var Row=[];
+for(var j=0;j<UseTable[i].length;j++){
+Row.push(UseTable[i][j]);
+
+}
+OrigUse.push(Row.slice());
+}
+for(var j=0;j<UseColumnHeaders.length;j++){
+OrigColHead.push(UseColumnHeaders[j]);
+
+}
+UseTable=[];
+UseColumnHeaders=[];
+var ColIndexes=[];
+if(Selected.type=='col'||Selected.type=='cell'){
+
+if(Selected.type=='cell'){
+for(var i=0;i<Selected.data.length;i++){
+ColIndexes.push(Selected.data[i][1]);
+}
+}
+else{
+ColIndexes=Selected.data;
+}
+}
+
+//console.log(ColIndexes,OrigColHead[ColIndexes[0]]);
+
+for(var i=0;i<OrigColHead.length;i++){
+
+if (ColIndexes.indexOf(i)==-1){
+UseColumnHeaders.push(OrigColHead[i]);
+}
+
+
+}
+
+
+for(var i=0; i<OrigUse.length;i++){
+var newrow=[];
+
+for(var j=0; j<OrigUse[i].length;j++){
+
+if (ColIndexes.indexOf(j)==-1){
+newrow.push(OrigUse[i][j]);
+}
+
+
+}
+
+
+UseTable.push(newrow.slice());
+
+}
+
+Selected={'type':'none','data':[]};
+DrawHeatMap();
+}
+
+
+
+
+
+
+function cluster(){
+ShowMask();
+var OrigUse=[];
+var OrigRowHeaders=[];
+for(var i=0;i<UseTable.length;i++){
+var Row=[];
+for(var j=0;j<UseTable[i].length;j++){
+Row.push(UseTable[i][j]);
+
+}
+OrigUse.push(Row.slice());
+OrigRowHeaders.push(UseRowHeaders[i]);
+}
+
+			
+			if(ClusterRow.checked == true){
+			HeatmapToCluster = [];
+			
+			Ordering = new Array();
+			for(var row=0; row<UseRowHeaders.length; row++){ //need to cluster the rows
+			NameDataCombo = new Array();
+			NameDataCombo.push(row.toString());
+			NameDataCombo.push(UseTable[[row]]);
+			//can get the data of the ROW by ROW = UseTable[[HeadersArray[row]]]
+			HeatmapToCluster.push(NameDataCombo);
+			Ordering.push("");
+			}
+			
+			//Make distance matrix for the heatmap rows
+		ClusNum=0;
+while(HeatmapToCluster.length>2){
+console.log(HeatmapToCluster.length);
+UpdateMask(HeatmapToCluster.length);
+//DISTANCE=new Array();
+		MinScore=100000;
+			MinXY=[0,0];
+			for(FFF in HeatmapToCluster){
+			//DISTANCE[FFF]=new Array();
+	
+			for(GGG in HeatmapToCluster){
+			ROWONE = HeatmapToCluster[FFF][1];
+			ROWTWO = HeatmapToCluster[GGG][1];
+			TD=0;
+			for(V=0;V<ROWONE.length;V++){
+			if(!isNaN(parseFloat(ROWONE[V])) && !isNaN(parseFloat(ROWTWO[V]))){
+			TD=TD+Math.pow(parseFloat(ROWONE[V])-parseFloat(ROWTWO[V]),2);}
+			}
+			TD=Math.sqrt(TD);
+			//DISTANCE[FFF][GGG]=TD;
+			if(FFF != GGG){
+			if(MinScore > TD){
+			MinScore=Math.min(MinScore,TD);
+			MinXY=[HeatmapToCluster[FFF][0],HeatmapToCluster[GGG][0]];
+			INDXY=[parseInt(FFF),parseInt(GGG)];
+			MROWONE=ROWONE;
+			MROWTWO=ROWTWO;
+			}
+			}
+			}
+			
+			}
+			//Ordering[MinXY[0]]=Ordering[MinXY[0]]+"_"+ClusNum;
+		//	Ordering[MinXY[1]]=Ordering[MinXY[1]]+"_"+ClusNum;
+			//ClusNum++;
+			if(INDXY[0]>INDXY[1]){
+			BigInd = INDXY[0];
+			SmalInd = INDXY[1];
+			}
+			else{
+			BigInd = INDXY[1];
+			SmalInd = INDXY[0];
+			}
+			
+			ROWONE = MROWONE;
+			ROWTWO = MROWTWO;
+			TD=0;
+			NewDif=new Array();
+			for(V=0;V<ROWONE.length;V++){
+			
+			NewDif.push((parseFloat(ROWONE[V])+parseFloat(ROWTWO[V]))/2);
+			
+			}
+			HeatmapToCluster.splice(BigInd,1);
+			HeatmapToCluster[SmalInd]=[MinXY[1]+"_"+MinXY[0],NewDif];
+			
+			}
+			
+			if(HeatmapToCluster.length == 2){
+			ORDER=new Array();
+			for(var GGG =0; GGG < 2; GGG++){
+			ORDERS=HeatmapToCluster[GGG][0].split("_");
+			for(var JJJ=0;JJJ<ORDERS.length;JJJ++){
+			ORDER.push(parseInt(ORDERS[JJJ]));
+						}
+						}
+			TARRAY=new Array();
+			UseTable=new Array();
+			for (var row=0; row < UseRowHeaders.length; row++){
+			TARRAY.push(UseRowHeaders[ORDER[row]]);
+			UseTable.push(OrigUse[[ORDER[row]]])
+			}
+			UseRowHeaders=new Array();
+			
+			for (var row=0; row < TARRAY.length; row++){
+			UseRowHeaders.push(TARRAY[row]);
+			
+			}
+			}
+			//console.log(HeatmapToCluster);
+			
+			
+			//using EuclideanDistance
+			
+			
+			}
+			
+HideMask();
+DrawHeatMap();
+
+}
+
+
+function ReorderUseTable(){
+//Shift use table, Move rows/columns/cells of  Selected to the NewHightlightPos [R,C]
+
+
+//So we have Selected (old IDs) and we have NewHightlightPos (new position (-.5,.5,1.5,...)
+//if current index is larger than new position, then place it (flag as placed), and then place the entry of that index
+//If flag as placed not occured, place at end.
+var RowsToBeHigh=[];
+var ColToBeHigh=[];
+var OrigUse=[];
+var OrigRowHeaders=[];
+for(var i=0;i<UseTable.length;i++){
+var Row=[];
+for(var j=0;j<UseTable[i].length;j++){
+Row.push(UseTable[i][j]);
+
+}
+OrigUse.push(Row.slice());
+OrigRowHeaders.push(UseRowHeaders[i]);
+}
+UseTable=[];
+UseRowHeaders=[];
+
+//console.log(OrigUse);
+var RowIndexes=[];
+if(Selected.type=='row' || Selected.type=='cell'){ //Take highlighted rows, place them in new spot
+
+if(Selected.type=='cell'){
+for(var i=0;i<Selected.data.length;i++){
+RowIndexes.push(Selected.data[i][0]);
+}
+}
+else{
+RowIndexes=Selected.data;
+
+}
+}
+//First get rows of interest:
+ RowsToPack=[];
+ RowheadersToPack=[];
+for(var i=0; i<OrigUse.length;i++){
+if(RowIndexes.indexOf(i)!=-1){
+RowsToPack.push(OrigUse[i].slice());
+RowheadersToPack.push(OrigRowHeaders[i]);
+}
+}
+//console.log(RowIndexes, RowsToPack);
+done=false;
+for(var i=0; i<OrigUse.length;i++){
+
+if(i>=NewHightlightPos[0] &&!done){
+done=true;
+for (var j=0;j<RowsToPack.length;j++){
+ RowsToBeHigh.push(UseTable.length);
+UseTable.push(RowsToPack[j].slice());
+UseRowHeaders.push(RowheadersToPack[j]);
+
+}
+}
+if (RowIndexes.indexOf(i)==-1){
+//console.log('HereAlso',i,RowIndexes);
+UseTable.push(OrigUse[i].slice());
+UseRowHeaders.push(OrigRowHeaders[i]);
+}
+
+}
+if(!done){
+
+for (var j=0;j<RowsToPack.length;j++){
+RowsToBeHigh.push(UseTable.length);
+UseTable.push(RowsToPack[j].slice());
+UseRowHeaders.push(RowheadersToPack[j]);
+
+}
+}
+
+
+//console.log(UseTable);
+
+var OrigUse=[];
+var OrigColHead=[];
+for(var i=0;i<UseTable.length;i++){
+var Row=[];
+for(var j=0;j<UseTable[i].length;j++){
+Row.push(UseTable[i][j]);
+
+}
+OrigUse.push(Row.slice());
+}
+for(var j=0;j<UseColumnHeaders.length;j++){
+OrigColHead.push(UseColumnHeaders[j]);
+
+}
+UseTable=[];
+UseColumnHeaders=[];
+var ColIndexes=[];
+if(Selected.type=='col'||Selected.type=='cell'){
+
+if(Selected.type=='cell'){
+for(var i=0;i<Selected.data.length;i++){
+ColIndexes.push(Selected.data[i][1]);
+}
+}
+else{
+ColIndexes=Selected.data;
+}
+}
+
+//console.log(ColIndexes,OrigColHead[ColIndexes[0]]);
+done=false;
+for(var i=0;i<OrigColHead.length;i++){
+if(i>= NewHightlightPos[1] &&!done){
+done=true;
+for(var t=0;t<ColIndexes.length;t++){
+ColToBeHigh.push(UseColumnHeaders.length);
+UseColumnHeaders.push(OrigColHead[ColIndexes[t]]);
+}
+}
+if (ColIndexes.indexOf(i)==-1){
+UseColumnHeaders.push(OrigColHead[i]);
+}
+
+
+}
+if(!done){
+
+for(var t=0;t<ColIndexes.length;t++){
+ColToBeHigh.push(UseColumnHeaders.length);
+UseColumnHeaders.push(OrigColHead[ColIndexes[t]]);
+}
+
+}
+
+for(var i=0; i<OrigUse.length;i++){
+var newrow=[];
+done=false;
+for(var j=0; j<OrigUse[i].length;j++){
+if(j>= NewHightlightPos[1] &&!done){
+done=true;
+for(var t=0;t<ColIndexes.length;t++){
+newrow.push(OrigUse[i][ColIndexes[t]]);
+}
+}
+if (ColIndexes.indexOf(j)==-1){
+newrow.push(OrigUse[i][j]);
+}
+
+
+}
+if(!done){
+for(var t=0;t<ColIndexes.length;t++){
+newrow.push(OrigUse[i][ColIndexes[t]]);
+}
+}
+
+
+UseTable.push(newrow.slice());
+
+}
+
+var NumHighlighted=Selected.data.length;
+var newarray=[];
+if(Selected.type=='row'){
+Selected.data=RowsToBeHigh;
+}
+else if(Selected.type=='col'){
+
+Selected.data=ColToBeHigh;
+}
+else if (Selected.type=='cell'){
+var NewCords=[];
+for(var i=0;i<Selected.data.length;i++){
+NewCords.push([RowsToBeHigh[i],ColToBeHigh[i]])
+
+}
+Selected.data=NewCords;
+}
+else{
+Selected={'type':'none','data':[]};
+
+}
+
+
+}
+
+
+
+function GetPos(Canv,Xpos,Ypos){
+ if(ShowNums.checked==true){
+  MinCell=Math.max(GloCell,30);
+  }
+  else{
+  MinCell=GloCell;
+  }
+  var X=Math.round(Xpos/MinCell);
+var Y=Math.round(Ypos/MinCell);
+var CanvRow=Canv.id.split(',')[0];
+var CanvCol=Canv.id.split(',')[1];
+
+var C=0;
+var R=0;
+
+if(CanvCol!='0'){
+
+C=Math.max(X+parseInt(CanvCol-1)*(MaxWidth/MinCell),C);
+}
+if(CanvRow!='0'){
+R=Math.max(R,Y+parseInt(CanvRow-1)*(MaxHeight/MinCell));
+}
+//console.log(R,C)
+return [R,C];
+}
+
+NewHightlightPos=[0,0];
+function GetClickedRowCol(Canv,Xpos,Ypos){
+//and the X and Y position of the click.
+//At this stage should console log the clicked row.
+
+
+ if(ShowNums.checked==true){
+  MinCell=Math.max(GloCell,30);
+  }
+  else{
+  MinCell=GloCell;
+  }
+var X=Math.floor(Xpos/MinCell);
+var Y=Math.floor(Ypos/MinCell);
+var CanvRow=Canv.id.split(',')[0];
+var CanvCol=Canv.id.split(',')[1];
+//console.log(X,Y);
+
+//console.log(UseColumnHeaders[X],UseRowHeaders[Y]);
+if(CanvRow=='0'){
+
+if(CanvCol!='0'){
+var index=X+parseInt(CanvCol-1)*(MaxWidth/MinCell);
+return {'type':'col','data':[index]};
+//console.log(UseColumnHeaders[index]);//Highlight column
+}
+}
+else if (CanvCol=='0'){
+var index=Y+parseInt(CanvRow-1)*(MaxHeight/MinCell);
+return {'type':'row','data':[index]};
+//console.log(UseRowHeaders[index]);//Highlight row
+}
+else{
+
+var Row=null;
+
+
+for(var i=0; i<RowClickTable.length;i++){
+if((CanvRow==RowClickTable[i]['CanvRow'])&&(Y*MinCell==RowClickTable[i]['LastY'])){
+Row=RowClickTable[i];
+break
+}
+
+}
+var Col=null;
+for(var i=0; i<ColClickTable.length;i++){
+if((CanvCol==ColClickTable[i]['CanvCol'])&&(X*MinCell==ColClickTable[i]['LastX'])){
+Col=ColClickTable[i];
+break
+}
+
+}
+
+if(Row!=null){
+//console.log(Row['DatRow']+(MaxHeight/MinCell)*(Row['CanvRow']-1))
+var Rindex=Row['DatRow'];//+(MaxHeight/MinCell)*(Row['CanvRow']-1);
+
+if(Col !=null){
+//console.log(Col['DatCol']);
+var Cindex=Col['DatCol'];
+return {'type':'cell','data':[[Rindex,Cindex]]};
+//console.log(UseTable[Rindex][Cindex]); //Highlight cell
+}
+
+}
+ 
+}
+return {'type':'none','data':[]};
+}
+DidThis=false;
+function DrawHelper(DrawCanv){
+var FrontStringTop='Front_0,'+DrawCanv.id.split(',')[1];
+var FrontStringLeft='Front_'+DrawCanv.id.split(',')[0]+',0';
+var BackStringTop='Back_0,'+DrawCanv.id.split(',')[1];
+var BackStringLeft='Back_'+DrawCanv.id.split(',')[0]+',0';
+
+var FrontCanvTop=document.getElementById(FrontStringTop);
+var FrontCanvLeft=document.getElementById(FrontStringLeft);
+
+
+var RendTopString='0,'+DrawCanv.id.split(',')[1];
+var RendLeftString=DrawCanv.id.split(',')[0]+',0';
+var RendTop=document.getElementById(RendTopString);
+var RendLeft=document.getElementById(RendLeftString);
+if(DidThis){
+FrontStuffTop.clearRect(0,0,FrontStuffTop.canvas.width,FrontStuffTop.canvas.height);
+FrontStuffLeft.clearRect(0,0,FrontStuffLeft.canvas.width,FrontStuffLeft.canvas.height);
+RendStuffTop.clearRect(0,0,FrontStuffTop.canvas.width,FrontStuffTop.canvas.height);
+RendStuffLeft.clearRect(0,0,FrontStuffLeft.canvas.width,FrontStuffLeft.canvas.height);
+RendStuffTop.drawImage(BackCanvTop,0,0);
+RendStuffLeft.drawImage(BackCanvLeft,0,0);
+}
+ BackCanvTop=document.getElementById(BackStringTop);
+ BackCanvLeft=document.getElementById(BackStringLeft);
+ FrontStuffTop=FrontCanvTop.getContext('2d');
+ FrontStuffLeft=FrontCanvLeft.getContext('2d');
+ RendStuffLeft=RendLeft.getContext('2d');
+ RendStuffTop=RendTop.getContext('2d');
+
+DidThis=true;
+
+ 
+
+
+var RowID=parseInt(DrawCanv.id.split(',')[0])-1;
+var ColID=parseInt(DrawCanv.id.split(',')[1])-1;
+//Do stuff
+var Xcoords=(NewHightlightPos[1]-ColID*(MaxWidth/MinCell))*MinCell;
+var Ycoords=(NewHightlightPos[0]-RowID*(MaxHeight/MinCell))*MinCell;
+FrontStuffTop.fillStyle='black';
+FrontStuffLeft.fillStyle='black';
+//console.log(RowID,ColID);
+if(ColID>=0){
+FrontStuffTop.fillRect(Xcoords-5,FrontStuffTop.canvas.height-15,10,15);
+}
+if(RowID>=0){
+FrontStuffLeft.fillRect(FrontStuffLeft.canvas.width-15,Ycoords-5,15,10);
+}
+RendStuffTop.clearRect(0,0,FrontStuffTop.canvas.width,FrontStuffTop.canvas.height);
+RendStuffLeft.clearRect(0,0,FrontStuffLeft.canvas.width,FrontStuffLeft.canvas.height);
+RendStuffTop.drawImage(BackCanvTop,0,0);
+RendStuffLeft.drawImage(BackCanvLeft,0,0);
+RendStuffTop.drawImage(FrontCanvTop,0,0);
+RendStuffLeft.drawImage(FrontCanvLeft,0,0);
+//console.log(NewHightlightPos);
+
+
+}
+
+
+
+ ReadCount=0;
+ SuperFile='';
+function LoadLotsOfFiles(evt) {
+
+if(evt.target.files.length>0){
+var BODY=document.getElementById('Display');
+var BBB=BODY.cloneNode(false);
+BODY.parentNode.replaceChild(BBB ,BODY);
+MultiFile.style.visibility='visible';
+ManyDataFiles=[];
+
+ManyReader = new FileReader();
+
+	
+	
+	ManyReader.onload = function(e){
+	console.log(ReadCount,'/',SuperFile.length,':',SuperFile[ReadCount].name);
+	
+	var LocRowHeaders=[];
+	var LocColHeaders=[];
+	var LocRawData=[];
+	 contents = e.target.result.split('\r');
+	 var FirstRow=0;
+	for(var i=ColLabels; i<contents.length; i++){
+	var TmpString=contents[i].replace(',',"'',");
+	var arr = TmpString.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
+arr = arr || [];
+	var Cells = arr; 
+	if (Cells.length > 1){
+	if(FirstRow==0){
+	FirstRow=1;
+	for(var j=0;j<RowNames;j++){
+	Cells.shift();
+	}
+	Cells.shift();
+	LocColHeaders=Cells;
+	}
+	else{
+		for(var j=0;j<RowNames;j++){
+	Cells.shift();
+	}
+	LocRowHeaders.push(Cells.shift().replace("''",""));
+	LocRawData.push(Cells);
+	
+	
+	}
+	
+	}
+}
+ManyDataFiles.push({'name':SuperFile[ReadCount].name,'rawdata':LocRawData,'colheaders':LocColHeaders,'rowheaders':LocRowHeaders});
+if(ReadCount==0){
+MakeAsIfHeatmap(ManyDataFiles[0]);
+}
+ReadCount++;
+if(ReadCount<SuperFile.length){
+ManyReader.readAsText(SuperFile[ReadCount]);
+}
+	//TranslateDataArray();
+	}
+	
+
+    SuperFile = evt.target.files; // FileList object
+	ManyReader.readAsText(SuperFile[0]);
+
+	}
+	}
+function MakeAsIfHeatmap(SpecificData){
+NAMES.textContent=SpecificData['name'];
+RawData=SpecificData['rawdata'];
+RowHeaders=SpecificData['rowheaders'];
+ColumnHeaders=SpecificData['colheaders'];
+TranslateDataArray();
+}
+CurrentNum=0;
+function Prev(){
+if(CurrentNum-1 <0){
+CurrentNum=ManyDataFiles.length-1;
+}
+else{
+CurrentNum--;
+}
+ MakeAsIfHeatmap(ManyDataFiles[CurrentNum]);
+
+
+}
+function Next(){
+if(CurrentNum+1 == ManyDataFiles.length){
+CurrentNum=0;
+}
+else{
+CurrentNum++;
+}
+ MakeAsIfHeatmap(ManyDataFiles[CurrentNum]);
+}	
+	
+	
+
+
+  GenerateBinValues();
+  document.getElementById('file').addEventListener('change', handleFileSelect, false);
+  document.getElementById('DirLoad').addEventListener('change', LoadLotsOfFiles, false);
+ 
+ 
+
+
+
+</script>
+ 
+</body>
+</html>
